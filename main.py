@@ -10,7 +10,7 @@ class DaySelector:
         days_options = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"]
 
         while True:
-            selected_day = input("Select a day of the week: ").capitalize()
+            selected_day = input("Select a day of the week: ").title()
             if selected_day in days_options:
                 return selected_day
             print("Please select a valid day.")
@@ -19,6 +19,7 @@ class DaySelector:
     def sorted_days():
         """Prompts the user for the number of gym days and returns a sorted list of unique days."""
         days_options = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"]
+        
         while True:
             try:
                 number_of_days = int(input("How many days a week will you go to the gym?: "))
@@ -36,8 +37,9 @@ class DaySelector:
                 print("Please enter a valid number.")
 
 class SelectMuscleGroupsAndExercises(ABC):
-    def __init__(self):
+    def __init__(self, split_name):
         self.muscle_groups_by_day = {} 
+        self.split_name = split_name
 
     def collect_muscle_groups_by_day(self, gym_days):
         print("\nFor each day, select the muscle group you want to train:")
@@ -50,8 +52,9 @@ class SelectMuscleGroupsAndExercises(ABC):
                 }
         self.display_schedule()
         self.write_to_csv()
-        User_rutine = UserRoutine()
-        User_rutine.register()
+        user_routine = UserRoutine(self.split_name)
+        user_routine.muscle_groups_by_day = self.muscle_groups_by_day
+        user_routine.register()
 
     def collect_exercises(self, muscle_group):
         """Collects exercises for a given muscle group."""
@@ -75,7 +78,7 @@ class SelectMuscleGroupsAndExercises(ABC):
 
     def write_to_csv(self):
         """Writes the training schedule to a CSV file."""
-        filename = 'split.csv'
+        filename = f"{self.split_name}.csv"
         if os.path.exists(filename):
             os.remove(filename)
         
@@ -92,13 +95,13 @@ class SelectMuscleGroupsAndExercises(ABC):
 
 class CreateSplit:
     def __init__(self):
-        self.split_names = [] 
+        self.split_name = ""
         self.gym_days = []  
 
     def create_custom_split(self):
         """Creates a new custom split and prompts for weekly days."""
         new_split_name = input("Enter the name for the new split: ")  
-        self.split_names.append(new_split_name)
+        self.split_name = new_split_name
         print(f"Custom split '{new_split_name}' created.")
 
         self.gym_days = DaySelector.sorted_days()
@@ -108,7 +111,7 @@ class CreateSplit:
 
     def select_muscle_distribution(self):
         """Collects muscle groups and exercises for the selected days."""
-        exercise_selector = SelectMuscleGroupsAndExercises()
+        exercise_selector = SelectMuscleGroupsAndExercises(self.split_name)
         exercise_selector.collect_muscle_groups_by_day(self.gym_days)
 
 class ArnoldSplit(SelectMuscleGroupsAndExercises):    
@@ -156,15 +159,15 @@ class MainMenu:
                 
             
 class UserRoutine(SelectMuscleGroupsAndExercises):
-    def __init__(self):
-        super().__init__()
+    def __init__(self, split_name):
+        super().__init__(split_name)
         self.muscle_groups_by_day = {}
-
+   
     
     def register(self):
         user_register = input("Do you want to register your last workouts? (yes/no): ").lower()
         if user_register == "yes":
-            stats.call_module()
+            stats.call_module(self.split_name)
         else:
             user_routines = input("Do you want to modify your routine? (yes/no): ").lower()
             if user_routines == "yes":
@@ -184,24 +187,24 @@ class UserRoutine(SelectMuscleGroupsAndExercises):
         self.display_schedule()
 
         while True: 
-            day_to_modify = input("Enter the day you want to modify: ").capitalize()
+            day_to_modify = input("Enter the day you want to modify: ").title()
             if day_to_modify not in self.muscle_groups_by_day:
                 print(f"No routine found for {day_to_modify}.")
-            break
+                continue
+            
+            new_muscle_group = input(f"Enter the new muscle group for {day_to_modify}: ").title()
+            new_exercises = self.collect_exercises(new_muscle_group)
 
-
-        new_muscle_group = input(f"Enter the new muscle group for {day_to_modify}: ").capitalize()
-        new_exercises = self.collect_exercises(new_muscle_group)
-
-        self.muscle_groups_by_day[day_to_modify] = {
-            'group': new_muscle_group,
-            'exercises': new_exercises
-        }
+            self.muscle_groups_by_day[day_to_modify] = {
+                'group': new_muscle_group,
+                'exercises': new_exercises
+            }
         
-        self.display_schedule()
-        self.write_to_csv()
-        self.register()
+            self.display_schedule()
+            self.write_to_csv()
+            self.register()
     
 if __name__ == "__main__":
     menu = MainMenu()
     menu.start()
+

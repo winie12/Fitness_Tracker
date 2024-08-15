@@ -47,7 +47,7 @@ def workout_register(exercises_dict, filename):
                         if reps < 0:
                             print("Please enter a number greater than 0.")
                             continue
-                        weight = float(input(f"Weight used in set {i}: "))
+                        weight = float(input(f"Weight used in set {i} (kg): "))
                         if weight < 0.5:
                             print("Please enter a valid weight.")
                             continue
@@ -71,9 +71,9 @@ def workout_register(exercises_dict, filename):
     print(f"Data registered")
    
 
-def call_module():
+def call_module(split_name):
     
-    split_filename = '/Users/nicolasdominguez/Desktop/Fitness_tracker_2.0/split.csv'
+    split_filename = f'/Users/nicolasdominguez/Desktop/Fitness_tracker_2.0/{split_name}.csv'
     workouts_filename = '/Users/nicolasdominguez/Desktop/Fitness_tracker_2.0/register/workouts.csv'
     split_data = load_exercises(split_filename)
         
