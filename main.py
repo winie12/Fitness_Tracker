@@ -1,7 +1,9 @@
 import os
 import pandas as pd
 from abc import ABC, abstractmethod
-import register.routine_register as stats
+from register.routine_register import call_module
+from datetime import datetime
+
 
 class DaySelector:
     @staticmethod
@@ -41,18 +43,21 @@ class SelectMuscleGroupsAndExercises(ABC):
         self.muscle_groups_by_day = {} 
         self.split_name = split_name
 
-    def collect_muscle_groups_by_day(self, gym_days):
+    def collect_muscle_groups_by_day(self, gym_days, predefined_groups = None):
         print("\nFor each day, select the muscle group you want to train:")
-        for day in gym_days:
-                muscle_group = input(f"What will you train on {day}? ").capitalize()
-                exercises = self.collect_exercises(muscle_group)
-                self.muscle_groups_by_day[day] = {
-                    'group': muscle_group,
-                    'exercises': exercises
-                }
+        for i, day in enumerate(gym_days):
+            if predefined_groups:
+                muscle_group = predefined_groups[i]
+            else:
+                muscle_group = input(f"What will you train on {day}? ").title()
+            exercises = self.collect_exercises(muscle_group)
+            self.muscle_groups_by_day[day] = {
+                'group': muscle_group,
+                'exercises': exercises
+            }
         self.display_schedule()
         self.write_to_csv()
-        user_routine = UserRoutine(self.split_name)
+        user_routine = WorkoutTracker(self.split_name)
         user_routine.muscle_groups_by_day = self.muscle_groups_by_day
         user_routine.register()
 
@@ -115,10 +120,21 @@ class CreateSplit:
         exercise_selector.collect_muscle_groups_by_day(self.gym_days)
 
 class ArnoldSplit(SelectMuscleGroupsAndExercises):    
-    pass  
+    def __init__(self):
+        super().__init__("Arnold split")
+        self.predefined_groups = ["Chest and back", "Arms and shoulders", "Leg", "Chest and back", "Arms and shoulders", "Leg"]
+    
+    def collect_muscle_groups_by_day(self, gym_days):
+       super().collect_muscle_groups_by_day(gym_days, predefined_groups = self.predefined_groups)
 
 class PplSplit(SelectMuscleGroupsAndExercises):    
-    pass  
+    def __init__(self):
+        super().__init__("PPL")
+        self.predefined_groups = ["Chest, triceps and shoulders", "Back, biceps and forearms", "Leg", "Chest, triceps and shoulders", "Back, bicep and forearms", "Leg"]
+    
+    def collect_muscle_groups_by_day(self, gym_days):
+       super().collect_muscle_groups_by_day(gym_days, predefined_groups = self.predefined_groups)
+
 
 class MainMenu:
     def __init__(self):
@@ -126,13 +142,14 @@ class MainMenu:
             1: ("Push, Pull, Legs", PplSplit),
             2: ("Arnold split", ArnoldSplit),
             3: ("Personalized split", CreateSplit),
-            4: ("Exit", None)
+            4: ("Access your routines", AccessUserRoutine),
+            5: ("Exit", None)
         }
-        self.default_days = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"]  
-
+        self.default_days = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"]
+       
     def start(self):
         """Displays the main menu and handles user input."""
-        print("\nWelcome to the fitness tracker\nSelect your split please\n")
+        print("\nWelcome to the fitness tracker\nSelect an option\n")
         
         for i, (name, _) in self.splits.items():
             print(f"{i}: {name}")
@@ -145,43 +162,93 @@ class MainMenu:
                     if split_class:
                         if user_choice in [1, 2]:
                             instance = split_class()
-                            instance.collect_muscle_groups_by_day(self.default_days)  
+                            instance.collect_muscle_groups_by_day(self.default_days) 
                         elif user_choice == 3:
                             instance = split_class()
                             instance.create_custom_split()
+                        elif user_choice == 4:
+                            instance = split_class()
+                            instance.access_routine()  
                     else:   
                         print("Thanks for using the fitness tracker. Goodbye!")
-                    return  
+                    break  
                 else:
-                    print("Please enter a number between 1 and 4.")
+                    print("Please enter a number between 1 and 5.")
             except ValueError:
                 print("Invalid input. Please enter a valid number.")
-                
-            
-class UserRoutine(SelectMuscleGroupsAndExercises):
+
+class AccessUserRoutine():
+    def access_routine(self):
+        User_routine_name = input(f"Introduce the name of your routine/split: ").title()
+        file = f"{User_routine_name}.csv"
+        if os.path.isfile(file):
+            try:
+                user_routine = WorkoutTracker(User_routine_name)
+                user_routine.muscle_groups_by_day = self.load_routine(file)
+                user_routine.register()
+            except pd.errors.EmptyDataError:
+                print("The file is empty.")
+            except pd.errors.ParserError:
+                print("Cannot parse file.")
+            except Exception as e:
+                print(f"An error occurred: {e}")
+        else:
+            print("Cannot find file or routine does not exist.")
+            return_main_menu = MainMenu()
+            return_main_menu.start()
+
+    def load_routine(self, file):
+        """Loads routine data from CSV file."""
+        try:
+            df = pd.read_csv(file)
+            routine_data = {}
+            for _, row in df.iterrows():
+                day = row['Day']
+                routine_data[day] = {
+                    'group': row['Muscle Group'],
+                    'exercises': row['Exercises'].split(', ')
+                }
+            return routine_data
+        except Exception as e:
+            print(f"Error loading routine: {e}")
+            return {}
+
+                      
+class WorkoutTracker(SelectMuscleGroupsAndExercises):
     def __init__(self, split_name):
         super().__init__(split_name)
         self.muscle_groups_by_day = {}
    
     
     def register(self):
-        user_register = input("Do you want to register your last workouts? (yes/no): ").lower()
+        today_date = datetime.now().strftime("%Y-%m-%d")
+        today_weekday = datetime.now().weekday()
+        today_day = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"][today_weekday]
+        
+        muscle_group = self.muscle_groups_by_day.get(today_day, {}).get("group", "rest")
+        
+        if muscle_group == "rest":
+            print(f"Today is a rest day ")
+            return
+
+        print(f"Today muscle group is {muscle_group}")
+        user_register = input(f"Do you want to register todays routine ({today_date})? (yes/no): ").lower()
         if user_register == "yes":
-            stats.call_module(self.split_name)
+            call_module(self.split_name)
         else:
             user_routines = input("Do you want to modify your routine? (yes/no): ").lower()
             if user_routines == "yes":
                 self.modify_routine()
             else:
                 return_main_menu = MainMenu()
-                return_main_menu.start()
+                return return_main_menu.start()
             
     def modify_routine(self): 
         """Allows the user to modify the existing routine."""
         if not self.muscle_groups_by_day:
             print("No routine available to modify, add a new routine.")
             return_main_menu = MainMenu()
-            return return_main_menu.start()
+            return return_main_menu.start() 
 
         print("\nCurrent routine:")
         self.display_schedule()
@@ -190,20 +257,22 @@ class UserRoutine(SelectMuscleGroupsAndExercises):
             day_to_modify = input("Enter the day you want to modify: ").title()
             if day_to_modify not in self.muscle_groups_by_day:
                 print(f"No routine found for {day_to_modify}.")
-                continue
-            
-            new_muscle_group = input(f"Enter the new muscle group for {day_to_modify}: ").title()
-            new_exercises = self.collect_exercises(new_muscle_group)
+            else:
+                new_muscle_group = input(f"Enter the new muscle group for {day_to_modify}: ").title()
+                new_exercises = self.collect_exercises(new_muscle_group)
 
-            self.muscle_groups_by_day[day_to_modify] = {
-                'group': new_muscle_group,
-                'exercises': new_exercises
-            }
+                self.muscle_groups_by_day[day_to_modify] = {
+                    'group': new_muscle_group,
+                    'exercises': new_exercises
+                }
+
+                self.write_to_csv()
+                self.display_schedule()
+                self.register()
+            break
+            
         
-            self.display_schedule()
-            self.write_to_csv()
-            self.register()
-    
+        
 if __name__ == "__main__":
     menu = MainMenu()
     menu.start()
