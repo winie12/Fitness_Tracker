@@ -2,7 +2,6 @@ import pandas as pd
 import os
 from datetime import datetime
 
-
 def load_exercises(filename):
     """Loads exercises from a CSV file."""
     try:
@@ -148,7 +147,7 @@ def user_stats(filename):
             break
 
 
-def call_module(split_name, muscle_group):
+def call_module(split_name):
     """Main function to handle workout registration and statistics."""
     workouts_filename = "/Users/nicolasdominguez/Desktop/Fitness_tracker_2.0/register/workouts.csv"
     split_filename = f"/Users/nicolasdominguez/Desktop/Fitness_tracker_2.0/{split_name}.csv"
