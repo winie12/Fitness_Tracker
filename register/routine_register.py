@@ -1,6 +1,11 @@
+from os.path import exists
+from typing import Self
+from numpy import true_divide
 import pandas as pd
 import os
 from datetime import datetime
+
+
 
 def load_exercises(filename):
     """Loads exercises from a CSV file."""
@@ -16,21 +21,18 @@ def load_exercises(filename):
     except Exception as e:
         print(f"An error occurred: {e}")
 
-
 def get_exercises(dataframe):
-    """Converts a dataframe into a dictionary of exercises grouped by day."""
     exercise_dict = {}
     for _, row in dataframe.iterrows():
         day = row['Day']
         exercise_dict[day] = {
-            'group': row['Muscle Group'],
-            'exercises': row['Exercises'].split(', ')
+        'group': row['Muscle Group'],
+        'exercises': row['Exercises'].split(', ')
         }
     return exercise_dict
 
 
 def workout_register(exercises_dict, filename):
-    """Registers workout data by prompting the user for details."""
     data = []
     sorted_days = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"]
     
@@ -45,20 +47,39 @@ def workout_register(exercises_dict, filename):
         return 
     
     if today_day in exercises_dict:
-        details = exercises_dict[today_day]
-        exercises = details["exercises"]
+        datos = exercises_dict[today_day]
+        exercises = datos["exercises"]
         
         print(f'Day: {today_day}')
-        print(f'Muscle group: {details["group"]}')
+        print(f'Muscle group: {datos["group"]}')
         
         for exercise in exercises:
             print(f"What did you do for {exercise} on {today_date}?")
             
-            sets = get_positive_integer("Number of sets: ")
+            while True:
+                try:
+                    sets = int(input("Number of sets: "))
+                    if sets <= 0:
+                        print("Please enter a number greater than 0.")
+                        continue
+                    break
+                except ValueError:
+                    print("Please enter a valid number.")
             
             for i in range(1, sets + 1):
-                weight = get_positive_float(f"Weight used in set {i} (kg): ")
-                reps = get_positive_integer(f"How many reps did you do in set {i}?: ")
+                while True:
+                    try:
+                        weight = float(input(f"Weight used in set {i} (kg): "))
+                        if weight < 0.5:
+                            print("Please enter a valid weight.")
+                            continue
+                        reps = int(input(f"How many reps did you do in set {i}?: "))
+                        if reps < 0:
+                            print("Please enter a number greater than 0.")
+                            continue
+                        break
+                    except ValueError:
+                        print("Please enter a valid number.")
                 
                 data.append({
                     'Date': today_date,
@@ -68,52 +89,25 @@ def workout_register(exercises_dict, filename):
                     'Weight': weight
                 })
     
-    save_to_csv(filename, pd.DataFrame(data))
+    df = pd.DataFrame(data)
+    
+    if not os.path.isfile(filename):
+        df.to_csv(filename, mode="w", index=False)
+    else:
+        df.to_csv(filename, mode="a",  index=False)
+    
     print("Data registered successfully.")
 
 
-def get_positive_integer(prompt):
-    """Prompts the user to enter a positive integer."""
-    while True:
-        try:
-            value = int(input(prompt))
-            if value <= 0:
-                print("Please enter a number greater than 0.")
-            else:
-                return value
-        except ValueError:
-            print("Please enter a valid number.")
-
-
-def get_positive_float(prompt):
-    """Prompts the user to enter a positive float."""
-    while True:
-        try:
-            value = float(input(prompt))
-            if value < 0.5:
-                print("Please enter a valid weight.")
-            else:
-                return value
-        except ValueError:
-            print("Please enter a valid number.")
-
-
-def save_to_csv(filename, df):
-    """Saves a dataframe to a CSV file."""
-    if not os.path.isfile(filename):
-        df.to_csv(filename, mode="w", header=True, index=False)
-    else:
-        df.to_csv(filename, mode="a", header=False, index=False)
-
 
 def user_stats(filename):
-    """Displays user statistics from a CSV file."""
     while True:
         try:
             df = pd.read_csv(filename)
+        
             if "Exercise" not in df.columns or "Weight" not in df.columns or "Reps" not in df.columns:
                 print("The file does not contain the required columns.")
-                return
+                break
 
             exercise_stat = input("Introduce the exercise you want to check: ").lower()
             df['Exercise'] = df['Exercise'].str.lower()
@@ -146,20 +140,38 @@ def user_stats(filename):
             print(f"An error occurred: {e}")
             break
 
-
-def call_module(split_name):
-    """Main function to handle workout registration and statistics."""
-    workouts_filename = "/Users/nicolasdominguez/Desktop/Fitness_tracker_2.0/register/workouts.csv"
+def call_module(split_name, muscle_group):
     split_filename = f"/Users/nicolasdominguez/Desktop/Fitness_tracker_2.0/{split_name}.csv"
+
+    def get_workout_filename(split_name):
+        folderpath = "/Users/nicolasdominguez/Desktop/Fitness_tracker_2.0/register"
+        
+        if not os.path.exists(folderpath):
+            os.makedirs(folderpath)
+        filename = os.path.join(folderpath, f"{split_name}_workout.csv")
+
+        return filename
+    
     
     split_data = load_exercises(split_filename)
     
     if split_data is not None:
         exercises_dict = get_exercises(split_data)
-        workout_register(exercises_dict, workouts_filename)
-    
-    user_gym_marks = input("Do you want to see your current gym marks? (yes/no): ").lower()
-    if user_gym_marks == "yes":
-        user_stats(workouts_filename)
+        workout_register(exercises_dict,get_workout_filename(split_name) )
     else:
-        print("Thanks for registering your data.")
+        print("Error loading exercises.")
+
+    
+def check_stats(split_name):
+    def get_workout_filename(split_name):
+        folderpath = "/Users/nicolasdominguez/Desktop/Fitness_tracker_2.0/register"
+        
+        if not os.path.exists(folderpath):
+            os.makedirs(folderpath)
+        
+        filename = os.path.join(folderpath, f"{split_name}_workout.csv")
+        return filename
+
+    
+    user_stats(get_workout_filename(split_name))
+    
